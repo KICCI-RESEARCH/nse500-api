@@ -2,9 +2,11 @@ import pandas as pd
 import requests, zipfile, io
 from datetime import datetime
 from db import get_conn
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 def bhavcopy_url(date):
-    return f"https://www1.nseindia.com/content/historical/EQUITIES/{date:%Y}/{date:%b}".upper() + f"/cm{date:%d%m%Y}bhav.csv.zip"
+    return f"https://www.nseindia.com/content/historical/EQUITIES/{date:%Y}/{date:%b}".upper() + f"/cm{date:%d%m%Y}bhav.csv.zip"
 
 def ensure_table_exists(conn):
     conn.execute("""
@@ -22,14 +24,25 @@ def ensure_table_exists(conn):
 def update_today_bhavcopy():
     today = datetime.today()
     conn = get_conn()
-    ensure_table_exists(conn)  # ✅ Ensure table exists before querying
+    ensure_table_exists(conn)
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM bhavcopy WHERE date = ?", (today.strftime('%Y-%m-%d'),))
-    if cursor.fetchone()[0] > 0:
-        return {"status": "already updated"}
     try:
+        cursor.execute("SELECT COUNT(*) FROM bhavcopy WHERE date = ?", (today.strftime('%Y-%m-%d'),))
+        if cursor.fetchone()[0] > 0:
+            return {"status": "already updated"}
+
         url = bhavcopy_url(today)
-        response = requests.get(url, headers={"User-Agent": "Mozilla/5.0"})
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "Accept-Encoding": "gzip, deflate",
+            "Accept": "*/*",
+            "Connection": "keep-alive"
+        }
+
+        session = requests.Session()
+        session.mount("https://", HTTPAdapter(max_retries=3))
+        response = session.get(url, headers=headers, timeout=10)
+
         if response.status_code == 200:
             with zipfile.ZipFile(io.BytesIO(response.content)) as z:
                 df = pd.read_csv(z.open(z.namelist()[0]))
@@ -55,3 +68,4 @@ def check_missing_dates():
     all_days = pd.date_range(start=df["date"].min(), end=datetime.today(), freq="B")
     missing = all_days.difference(df["date"])
     return {"missing_dates": missing.strftime("%Y-%m-%d").tolist()}
+
