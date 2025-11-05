@@ -1,3 +1,9 @@
+git add main.py
+git commit -m "Trigger redeploy"
+git push
+
+
+
 from fastapi import FastAPI
 
 app = FastAPI()
