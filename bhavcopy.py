@@ -1,12 +1,7 @@
 import pandas as pd
-import requests, zipfile, io
+import requests
 from datetime import datetime
 from db import get_conn
-from requests.adapters import HTTPAdapter
-from urllib3.util.retry import Retry
-
-def bhavcopy_url(date):
-    return f"https://www.nseindia.com/content/historical/EQUITIES/{date:%Y}/{date:%b}".upper() + f"/cm{date:%d%m%Y}bhav.csv.zip"
 
 def ensure_table_exists(conn):
     conn.execute("""
@@ -31,28 +26,29 @@ def update_today_bhavcopy():
         if cursor.fetchone()[0] > 0:
             return {"status": "already updated"}
 
-        url = bhavcopy_url(today)
+        url = "https://www.nseindia.com/api/equity-stockIndices?index=NIFTY%20500"
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-            "Accept-Encoding": "gzip, deflate",
-            "Accept": "*/*",
-            "Connection": "keep-alive"
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "application/json"
         }
 
-        session = requests.Session()
-        session.mount("https://", HTTPAdapter(max_retries=3))
-        response = session.get(url, headers=headers, timeout=10)
-
+        response = requests.get(url, headers=headers, timeout=10)
         if response.status_code == 200:
-            with zipfile.ZipFile(io.BytesIO(response.content)) as z:
-                df = pd.read_csv(z.open(z.namelist()[0]))
-                df = df[["SYMBOL", "OPEN", "HIGH", "LOW", "CLOSE", "TOTTRDQTY"]]
-                df["DATE"] = today.strftime('%Y-%m-%d')
-                df.columns = ["symbol", "open", "high", "low", "close", "volume", "date"]
-                df.to_sql("bhavcopy", conn, if_exists="append", index=False)
-                return {"status": "updated"}
+            data = response.json()
+            records = data["data"]
+            df = pd.DataFrame([{
+                "symbol": r["symbol"],
+                "open": r["open"],
+                "high": r["dayHigh"],
+                "low": r["dayLow"],
+                "close": r["lastPrice"],
+                "volume": r["quantityTraded"],
+                "date": today.strftime('%Y-%m-%d')
+            } for r in records])
+            df.to_sql("bhavcopy", conn, if_exists="append", index=False)
+            return {"status": "updated"}
         else:
-            return {"status": "bhavcopy not available", "code": response.status_code}
+            return {"status": "NSE API error", "code": response.status_code}
     except Exception as e:
         import traceback
         return {
@@ -68,5 +64,4 @@ def check_missing_dates():
     all_days = pd.date_range(start=df["date"].min(), end=datetime.today(), freq="B")
     missing = all_days.difference(df["date"])
     return {"missing_dates": missing.strftime("%Y-%m-%d").tolist()}
-
 
