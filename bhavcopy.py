@@ -1,7 +1,6 @@
 import pandas as pd
 import yfinance as yf
 import requests
-from bs4 import BeautifulSoup
 from datetime import datetime
 from db import get_conn
 
@@ -19,24 +18,14 @@ def ensure_table_exists(conn):
     """)
 
 def get_nifty500_symbols():
-    url = "https://www.niftyindices.com/indices/equity/stock-indices"
-    headers = {
-        "User-Agent": "Mozilla/5.0"
-    }
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
-    table = soup.find("table")
-    symbols = []
-
-    if table:
-        rows = table.find_all("tr")[1:]  # skip header
-        for row in rows:
-            cols = row.find_all("td")
-            if cols and len(cols) >= 2:
-                symbol = cols[1].text.strip()
-                if symbol:
-                    symbols.append(symbol + ".NS")
-    return symbols
+    url = "https://niftyindices.com/IndexConstituent/ind_nifty500list.csv"
+    try:
+        response = requests.get(url)
+        df = pd.read_csv(pd.compat.StringIO(response.text))
+        symbols = df["Symbol"].dropna().unique().tolist()
+        return [s + ".NS" for s in symbols]
+    except Exception as e:
+        return []
 
 def update_today_bhavcopy():
     today = datetime.today().strftime('%Y-%m-%d')
@@ -88,3 +77,4 @@ def check_missing_dates():
     all_days = pd.date_range(start=df["date"].min(), end=datetime.today(), freq="B")
     missing = all_days.difference(df["date"])
     return {"missing_dates": missing.strftime("%Y-%m-%d").tolist()}
+
