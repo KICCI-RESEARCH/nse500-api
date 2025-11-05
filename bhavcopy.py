@@ -19,9 +19,9 @@ def ensure_table_exists(conn):
     """)
 
 def get_nifty500_symbols():
-    url = "https://niftyindices.com/IndexConstituent/ind_nifty500list.csv"
+    url = "https://raw.githubusercontent.com/Hpareek07/NSEData/master/ind_nifty500list.csv"
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=10)
         df = pd.read_csv(io.StringIO(response.text))
         symbols = df["Symbol"].dropna().unique().tolist()
         return [s + ".NS" for s in symbols]
@@ -79,3 +79,4 @@ def check_missing_dates():
     all_days = pd.date_range(start=df["date"].min(), end=datetime.today(), freq="B")
     missing = all_days.difference(df["date"])
     return {"missing_dates": missing.strftime("%Y-%m-%d").tolist()}
+
