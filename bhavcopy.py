@@ -1,6 +1,7 @@
 import pandas as pd
 import yfinance as yf
 import requests
+import io
 from datetime import datetime
 from db import get_conn
 
@@ -21,10 +22,11 @@ def get_nifty500_symbols():
     url = "https://niftyindices.com/IndexConstituent/ind_nifty500list.csv"
     try:
         response = requests.get(url)
-        df = pd.read_csv(pd.compat.StringIO(response.text))
+        df = pd.read_csv(io.StringIO(response.text))
         symbols = df["Symbol"].dropna().unique().tolist()
         return [s + ".NS" for s in symbols]
     except Exception as e:
+        print("Error fetching symbols:", e)
         return []
 
 def update_today_bhavcopy():
@@ -77,4 +79,3 @@ def check_missing_dates():
     all_days = pd.date_range(start=df["date"].min(), end=datetime.today(), freq="B")
     missing = all_days.difference(df["date"])
     return {"missing_dates": missing.strftime("%Y-%m-%d").tolist()}
-
