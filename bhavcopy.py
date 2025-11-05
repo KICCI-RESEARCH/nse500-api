@@ -1,5 +1,5 @@
 import pandas as pd
-import requests
+import yfinance as yf
 from datetime import datetime
 from db import get_conn
 
@@ -17,38 +17,39 @@ def ensure_table_exists(conn):
     """)
 
 def update_today_bhavcopy():
-    today = datetime.today()
+    today = datetime.today().strftime('%Y-%m-%d')
     conn = get_conn()
     ensure_table_exists(conn)
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT COUNT(*) FROM bhavcopy WHERE date = ?", (today.strftime('%Y-%m-%d'),))
+        cursor.execute("SELECT COUNT(*) FROM bhavcopy WHERE date = ?", (today,))
         if cursor.fetchone()[0] > 0:
             return {"status": "already updated"}
 
-        url = "https://www.nseindia.com/api/equity-stockIndices?index=NIFTY%20500"
-        headers = {
-            "User-Agent": "Mozilla/5.0",
-            "Accept": "application/json"
-        }
+        # List of NSE symbols to fetch (append .NS for Yahoo Finance)
+        symbols = ["RELIANCE.NS", "TCS.NS", "INFY.NS", "HDFCBANK.NS", "ICICIBANK.NS"]
+        records = []
 
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            records = data["data"]
-            df = pd.DataFrame([{
-                "symbol": r["symbol"],
-                "open": r["open"],
-                "high": r["dayHigh"],
-                "low": r["dayLow"],
-                "close": r["lastPrice"],
-                "volume": r["quantityTraded"],
-                "date": today.strftime('%Y-%m-%d')
-            } for r in records])
+        for symbol in symbols:
+            data = yf.download(symbol, start=today, end=today)
+            if not data.empty:
+                row = data.iloc[0]
+                records.append({
+                    "symbol": symbol.replace(".NS", ""),
+                    "open": row["Open"],
+                    "high": row["High"],
+                    "low": row["Low"],
+                    "close": row["Close"],
+                    "volume": int(row["Volume"]),
+                    "date": today
+                })
+
+        if records:
+            df = pd.DataFrame(records)
             df.to_sql("bhavcopy", conn, if_exists="append", index=False)
-            return {"status": "updated"}
+            return {"status": "updated", "count": len(records)}
         else:
-            return {"status": "NSE API error", "code": response.status_code}
+            return {"status": "no data found"}
     except Exception as e:
         import traceback
         return {
@@ -64,4 +65,5 @@ def check_missing_dates():
     all_days = pd.date_range(start=df["date"].min(), end=datetime.today(), freq="B")
     missing = all_days.difference(df["date"])
     return {"missing_dates": missing.strftime("%Y-%m-%d").tolist()}
+
 
