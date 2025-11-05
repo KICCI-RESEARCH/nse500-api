@@ -34,38 +34,51 @@ def update_today_bhavcopy():
     conn = get_conn()
     ensure_table_exists(conn)
     cursor = conn.cursor()
+
     try:
         cursor.execute("SELECT COUNT(*) FROM bhavcopy WHERE date = ?", (today,))
         if cursor.fetchone()[0] > 0:
+            print("Already updated for today.")
             return {"status": "already updated"}
 
         symbols = get_nifty500_symbols()
         if not symbols:
+            print("Failed to fetch symbols.")
             return {"status": "failed to fetch symbols"}
 
         records = []
-        for symbol in symbols:
-            data = yf.download(symbol, start=today, end=today)
-            if not data.empty:
-                row = data.iloc[0]
-                records.append({
-                    "symbol": symbol.replace(".NS", ""),
-                    "open": row["Open"],
-                    "high": row["High"],
-                    "low": row["Low"],
-                    "close": row["Close"],
-                    "volume": int(row["Volume"]),
-                    "date": today
-                })
+        batches = [symbols[i:i+50] for i in range(0, len(symbols), 50)]
+        for batch in batches:
+            print(f"Processing batch of {len(batch)} symbols...")
+            for symbol in batch:
+                try:
+                    data = yf.download(symbol, start=today, end=today)
+                    if not data.empty:
+                        row = data.iloc[0]
+                        records.append({
+                            "symbol": symbol.replace(".NS", ""),
+                            "open": row["Open"],
+                            "high": row["High"],
+                            "low": row["Low"],
+                            "close": row["Close"],
+                            "volume": int(row["Volume"]),
+                            "date": today
+                        })
+                except Exception as e:
+                    print(f"Error fetching {symbol}: {e}")
 
         if records:
             df = pd.DataFrame(records)
             df.to_sql("bhavcopy", conn, if_exists="append", index=False)
+            print(f"Inserted {len(records)} records.")
             return {"status": "updated", "count": len(records)}
         else:
+            print("No data found.")
             return {"status": "no data found"}
+
     except Exception as e:
         import traceback
+        print("Exception occurred:", e)
         return {
             "error": str(e),
             "trace": traceback.format_exc()
