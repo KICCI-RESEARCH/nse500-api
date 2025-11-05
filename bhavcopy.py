@@ -69,3 +69,4 @@ def check_missing_dates():
     missing = all_days.difference(df["date"])
     return {"missing_dates": missing.strftime("%Y-%m-%d").tolist()}
 
+
