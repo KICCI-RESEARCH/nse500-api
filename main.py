@@ -13,5 +13,6 @@ def update_today():
 
 @app.get("/load_history")
 def load_history():
-    load_historical_data()
-    return {"status": "historical data loaded"}
+    print("Route hit!")
+    return {"status": "dummy route works"}
+
