@@ -1,18 +1,14 @@
 from fastapi import FastAPI
-from bhavcopy import update_today_bhavcopy, load_historical_data
+from nse500_fetcher import fetch_nse500_data
 
 app = FastAPI()
 
-@app.get("/")
-def root():
-    return {"status": "ok"}
-
-@app.get("/update_today")
-def update_today():
-    return update_today_bhavcopy()
-
-@app.get("/load_history")
-def load_history():
-    print("Route hit!")
-    return {"status": "dummy route works"}
-
+@app.get("/fetch_nse500")
+def fetch_nse500():
+    data, failed = fetch_nse500_data()
+    return {
+        "status": "completed",
+        "successful_count": len(data),
+        "failed_count": len(failed),
+        "failed_tickers": failed
+    }
