@@ -1,10 +1,5 @@
-git add main.py
-git commit -m "Trigger redeploy"
-git push
-
-
-
 from fastapi import FastAPI
+from bhavcopy import update_today_bhavcopy, load_historical_data
 
 app = FastAPI()
 
@@ -12,6 +7,11 @@ app = FastAPI()
 def root():
     return {"status": "ok"}
 
-@app.get("/test")
-def test():
-    return {"status": "test route active"}
+@app.get("/update_today")
+def update_today():
+    return update_today_bhavcopy()
+
+@app.get("/load_history")
+def load_history():
+    load_historical_data()
+    return {"status": "historical data loaded"}
