@@ -22,7 +22,7 @@ def ensure_table_exists(conn):
 def update_today_bhavcopy():
     today = datetime.today()
     conn = get_conn()
-    ensure_table_exists(conn)
+    ensure_table_exists(conn)  # ✅ Ensure table exists before querying
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM bhavcopy WHERE date = ?", (today.strftime('%Y-%m-%d'),))
     if cursor.fetchone()[0] > 0:
