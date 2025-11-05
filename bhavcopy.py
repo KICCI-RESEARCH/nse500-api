@@ -48,10 +48,11 @@ def update_today_bhavcopy():
 
         records = []
         batches = [symbols[i:i+50] for i in range(0, len(symbols), 50)]
-        for batch in batches:
-            print(f"Processing batch of {len(batch)} symbols...")
+        for batch_num, batch in enumerate(batches, start=1):
+            print(f"Processing batch {batch_num}/{len(batches)}...")
             for symbol in batch:
                 try:
+                    print(f"Fetching {symbol}...")
                     data = yf.download(symbol, start=today, end=today)
                     if not data.empty:
                         row = data.iloc[0]
@@ -92,4 +93,32 @@ def check_missing_dates():
     all_days = pd.date_range(start=df["date"].min(), end=datetime.today(), freq="B")
     missing = all_days.difference(df["date"])
     return {"missing_dates": missing.strftime("%Y-%m-%d").tolist()}
+
+def load_historical_data():
+    symbols = get_nifty500_symbols()
+    start = (datetime.today() - pd.Timedelta(days=1000)).strftime('%Y-%m-%d')
+    end = (datetime.today() - pd.Timedelta(days=1)).strftime('%Y-%m-%d')
+
+    conn = get_conn()
+    ensure_table_exists(conn)
+
+    batches = [symbols[i:i+50] for i in range(0, len(symbols), 50)]
+    for batch_num, batch in enumerate(batches, start=1):
+        print(f"Loading batch {batch_num}/{len(batches)}...")
+        for symbol in batch:
+            try:
+                print(f"Fetching history for {symbol}")
+                data = yf.download(symbol, start=start, end=end)
+                if not data.empty:
+                    data.reset_index(inplace=True)
+                    data["symbol"] = symbol.replace(".NS", "")
+                    data.rename(columns={
+                        "Open": "open", "High": "high", "Low": "low",
+                        "Close": "close", "Volume": "volume", "Date": "date"
+                    }, inplace=True)
+                    data[["symbol", "open", "high", "low", "close", "volume", "date"]].to_sql(
+                        "bhavcopy", conn, if_exists="append", index=False
+                    )
+            except Exception as e:
+                print(f"Error fetching {symbol}: {e}")
 
