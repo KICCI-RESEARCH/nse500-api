@@ -15,3 +15,7 @@ def update_today():
 def load_history():
     load_historical_data()
     return {"status": "historical data loaded"}
+
+@app.get("/routes")
+def list_routes():
+    return [route.path for route in app.router.routes]
