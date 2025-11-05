@@ -1,5 +1,6 @@
 nse500_api/
-├── bhavcopy.py
-├── db.py
 ├── main.py  ← this is where FastAPI lives
+├── bhavcopy.py
+├── nse500_fetcher.py
+├── db.py
 ├── requirements.txt
