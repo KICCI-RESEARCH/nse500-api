@@ -12,3 +12,5 @@ def fetch_nse500():
         "failed_count": len(failed),
         "failed_tickers": failed
     }
+    print("Importing fetch_nse500_data...")
+
