@@ -1,0 +1,6 @@
+fastapi
+uvicorn
+pandas
+requests
+sqlite3
+python-multipart
